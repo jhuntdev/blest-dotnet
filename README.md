@@ -25,103 +25,171 @@ Install BLEST.NET from NuGet
 
 ## Usage
 
-Use the `RequestHandler` class to create a request handler suitable for use in an existing .NET application. Use the `HttpServer` class to create a standalone HTTP server for your request handler. Use the `HttpClient` class to create a BLEST HTTP client.
+Use the `RequestHandler` class to create a request handler suitable for use in an existing .NET application. Use the `HttpServer` class to create a standalone HTTP server for your request handler.
+<!-- Use the `HttpClient` class to create a BLEST HTTP client. -->
 
 ### RequestHandler
 
 ```c#
-const express = require('express')
-const { createRequestHandler } = require('blest-js')
-
-const app = express()
-const port = 8080
+using System;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using Blest;
 
 // Create some middleware (optional)
-const authMiddleware = (params, context) => {
-  if (params?.name) {
-    context.user = {
-      name: params.name
-    }
-  } else {
-    throw new Error('Unauthorized')
+var authMiddleware = new Action<IDictionary<string, object?>, Dictionary<string, object?>>((parameters, context) =>
+{
+  if (parameters.ContainsKey("name"))
+  {
+    context["user"] = new Dictionary<string, object?>
+    {
+      { "name", parameters["name"] }
+    };
   }
-}
-
-// Create a route controller
-const greetController = (params, context) => {
-  return {
-    greeting: `Hi, ${context.user?.name}!`
-  }
-}
-
-// Create a request handler
-const requestHandler = createRequestHandler({
-    greet: [authMiddleware, greetController]
-})
-
-// Parse the JSON body
-app.use(express.json())
-
-// Use the request handler
-app.post('/', async (req, res, next) => {
-  const [result, error] = await requestHandler(req.body, {
-    headers: req.headers
-  })
-  if (error) {
-    return next(error)
-  } else {
-    res.json(result)
+  else
+  {
+    throw new Exception("Unauthorized");
   }
 });
 
-// Listen for requests
-app.listen(port, () => {
-  console.log(`Server listening on port ${port}`)
-})
+// Create a route controller
+var greetController = new Func<IDictionary<string, object?>, Dictionary<string, object?>, Dictionary<string, object?>>((parameters, context) =>
+{
+  if (!context.ContainsKey("user") || context["user"] == null || !((Dictionary<string, object?>)context["user"]).ContainsKey("name"))
+  {
+    throw new Exception("Unauthorized");
+  }
+
+  return new Dictionary<string, object?>
+  {
+    { "greeting", "Hi, " + ((Dictionary<string, object?>)context["user"])["name"] + "!" }
+  };
+});
+
+// Define your router
+var router = new Dictionary<string, List<Delegate>>
+{
+  { "greet", new List<Delegate> { authMiddleware, greetController } }
+};
+
+// Create a request handler
+var requestHandler = new RequestHandler(router);
+
+// Parse incoming JSON payload
+Dictionary<string, object?> payload = YourCustomJsonSerializer(request.Body);
+
+// Assemble context object
+Dictionary<string, object?> context = {
+  { "headers", request.Headers }
+};
+
+// Use the request handler
+object?[] resultError = await requestHandler.Handle(payload, context);
+dynamic? result = resultError[0];
+dynamic? error = resultError[1];
+if (error != null)
+{
+  // Do something in case of error
+}
+else
+{
+  // Do something with the result
+}
 ```
 
 ### HttpServer
 
 ```c#
-const { createHttpServer } = require('blest-js')
+using System;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using Blest;
 
-const port = 8080
+class Program
+{
+  public static async Task Main()
+  {
+    // Create some middleware (optional)
+    var authMiddleware = new Action<IDictionary<string, object?>, Dictionary<string, object?>>((parameters, context) =>
+    {
+        if (parameters.ContainsKey("name"))
+        {
+            context["user"] = new Dictionary<string, object?>
+            {
+                { "name", parameters["name"] }
+            };
+        }
+        else
+        {
+            throw new Exception("Unauthorized");
+        }
+    });
 
-// Create some middleware (optional)
-const authMiddleware = (params, context) => {
-  if (params?.name) {
-    context.user = {
-      name: params.name
-    }
-  } else {
-    throw new Error('Unauthorized')
+    // Create a route controller
+    var greetController = new Func<IDictionary<string, object?>, Dictionary<string, object?>, Dictionary<string, object?>>((parameters, context) =>
+    {
+        if (!context.ContainsKey("user") || context["user"] == null || !((Dictionary<string, object?>)context["user"]).ContainsKey("name"))
+        {
+            throw new Exception("Unauthorized");
+        }
+
+        return new Dictionary<string, object?>
+        {
+            { "greeting", "Hi, " + ((Dictionary<string, object?>)context["user"])["name"] + "!" }
+        };
+    });
+
+    // Define your router
+    var router = new Dictionary<string, List<Delegate>>
+    {
+        { "greet", new List<Delegate> { authMiddleware, greetController } }
+    };
+
+    // Create a request handler
+    var requestHandler = new RequestHandler(router);
+
+    // Create a server
+    HttpServer server = new HttpServer(requestHandler);
+
+    // Listen for requests
+    Console.WriteLine("Server listening on port 8080");
+    await server.Listen("http://localhost:8080/");
   }
 }
-
-// Create a route controller
-const greetController = (params, context) => {
-  return {
-    greeting: `Hi, ${context.user?.name}!`
-  }
-}
-
-// Create a request handler
-const requestHandler = createRequestHandler({
-    greet: [authMiddleware, greetController]
-})
-
-// Create a server
-const server = createHttpServer(requestHandler)
-
-// Listen for requests
-server.listen(port, () => {
-  console.log(`Server listening on port ${port}`)
-})
 ```
-
+<!-- 
 ### HttpClient
 
 ```c#
+using System;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Threading.Tasks;
+
+class Program
+{
+    static async Task Main()
+    {
+        using var client = new HttpClient();
+        client.BaseAddress = new Uri("http://localhost:8080");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "token");
+
+        var data = new { name = "Steve" };
+        var response = await client.PostAsJsonAsync("greet", data);
+        var result = await response.Content.ReadAsAsync<GreetingResponse>();
+
+        // Do something with the result
+    }
+}
+
+public class GreetingResponse
+{
+    // Define the structure of the response object
+    public string Greeting { get; set; }
+}
+
+
+
 const { createHttpClient } = require('blest-js')
 
 // Create a client
@@ -139,7 +207,7 @@ request('greet', { name: 'Steve' }, ['greeting'])
 .catch((error) => {
   // Do something in case of error
 })
-```
+``` -->
 
 ## License
 
