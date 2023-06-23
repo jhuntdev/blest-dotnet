@@ -1,0 +1,49 @@
+# Visual Studio files
+.vs/
+bin/
+obj/
+*.userprefs
+*.suo
+*.cache
+*.csproj.user
+*.pdb
+
+# Build results
+[Bb]uild/
+
+# NuGet packages
+*.nupkg
+packages/
+*.nuget.props
+*.nuget.targets
+
+# Test Results
+[Tt]est[Rr]esult*/
+*.trx
+*.log
+*.vspscc
+
+# Resharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# Visual Studio code coverage results
+*.coverage
+*.coveragexml
+
+# MSBuild
+*.swp
+*.*proj.user
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+
+# Linux
+*~
+\#*\#
