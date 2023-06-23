@@ -356,10 +356,145 @@ namespace Blest
     //         }
     //     }
     // }
+    
+    public class HttpClient
+    {
+        private readonly string url;
+        private readonly int maxBatchSize = 100;
+        private readonly List<object?[]> queue = new List<object?[]>();
+        private Timer? timeout;
+        private readonly System.Net.Http.HttpClient client = new System.Net.Http.HttpClient();
+        private readonly Dictionary<string, TaskCompletionSource<object>> pendingRequests = new Dictionary<string, TaskCompletionSource<object>>();
+
+        public HttpClient(string url)
+        {
+            this.url = url;
+        }
+
+        public async Task<object> Request(string route, IDictionary<string, object?>? parameters = null, IList<object?>? selector = null)
+        {
+            if (string.IsNullOrEmpty(route))
+            {
+                throw new ArgumentException("Route is required");
+            }
+
+            if (parameters != null && !(parameters is IDictionary<string, object?>))
+            {
+                throw new ArgumentException("Params should be a dictionary");
+            }
+
+            if (selector != null && !(selector is object[]))
+            {
+                throw new ArgumentException("Selector should be a list");
+            }
+
+            string id = Guid.NewGuid().ToString();
+            var tcs = new TaskCompletionSource<object>();
+
+            lock (pendingRequests)
+            {
+                pendingRequests[id] = tcs;
+            }
+
+            var item = new object?[] { id, route, parameters, selector };
+            queue.Add(item);
+
+            if (timeout == null)
+            {
+                timeout = new Timer(Process, null, 1, Timeout.Infinite);
+            }
+
+            return await tcs.Task;
+        }
+
+        private async void Process(object? state)
+        {
+            object?[][] newQueue;
+            lock (queue)
+            {
+                newQueue = queue.Count <= maxBatchSize ? queue.ToArray() : queue.GetRange(0, maxBatchSize).ToArray();
+                queue.RemoveRange(0, Math.Min(queue.Count, maxBatchSize));
+                timeout?.Dispose();
+                timeout = null;
+                if (queue.Count > 0)
+                {
+                    timeout = new Timer(Process, null, 1, Timeout.Infinite);
+                }
+            }
+
+            if (newQueue.Length > 0)
+            {
+                var json = JsonSerializer.Serialize(newQueue);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                try
+                {
+                    var response = await client.PostAsync(url, content);
+                    response.EnsureSuccessStatusCode();
+                    var responseJson = await response.Content.ReadAsStringAsync();
+                    var responseData = JsonSerializer.Deserialize<object[][]>(responseJson);
+                    if (responseData == null)
+                    {
+                        throw new Exception();
+                    }
+
+                    foreach (var item in responseData)
+                    {
+                        var id = (string)item[0]!;
+                        var result = item[2];
+                        var error = item[3] != null ? new Exception((string)item[3]!) : null;
+
+                        TaskCompletionSource<object>? tcs;
+                        lock (pendingRequests)
+                        {
+                            tcs = pendingRequests.GetValueOrDefault(id);
+                            if (tcs != null)
+                            {
+                                pendingRequests.Remove(id);
+                            }
+                        }
+
+                        if (tcs != null)
+                        {
+                            if (error != null)
+                            {
+                                tcs.SetException(error);
+                            }
+                            else
+                            {
+                                tcs.SetResult(result);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    foreach (var item in newQueue)
+                    {
+                        var id = (string)item[0]!;
+
+                        TaskCompletionSource<object>? tcs;
+                        lock (pendingRequests)
+                        {
+                            tcs = pendingRequests.GetValueOrDefault(id);
+                            if (tcs != null)
+                            {
+                                pendingRequests.Remove(id);
+                            }
+                        }
+
+                        if (tcs != null)
+                        {
+                            tcs.SetException(ex);
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     public class RequestHandler
     {
-        // List<Delegate<Dictionary<string, object?>, Dictionary<string, object?>, Task<Dictionary<string, object?>>>>>
         private readonly Dictionary<string, List<Delegate>> routes;
         private readonly Dictionary<string, object?>? options;
         private readonly string routeRegex = @"^[a-zA-Z][a-zA-Z0-9_\-\/]*[a-zA-Z0-9_\-]$";
