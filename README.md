@@ -15,13 +15,13 @@ For a front-end implementation in React, please visit https://github.com/jhunt/b
 - Single Endpoint - Reduce complexity and improve data privacy
 - Fully Encrypted - Improve data privacy
 
-## Installation
+<!-- ## Installation
 
 Install BLEST.NET from NuGet
 
 ```bash
 
-```
+``` -->
 
 ## Usage
 
