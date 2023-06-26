@@ -25,8 +25,7 @@ Install BLEST.NET from NuGet
 
 ## Usage
 
-Use the `RequestHandler` class to create a request handler suitable for use in an existing .NET application. Use the `HttpServer` class to create a standalone HTTP server for your request handler.
-<!-- Use the `HttpClient` class to create a BLEST HTTP client. -->
+Use the `RequestHandler` class to create a request handler suitable for use in an existing .NET application. Use the `HttpServer` class to create a standalone HTTP server for your request handler. Use the `HttpClient` class to create a BLEST HTTP client.
 
 ### RequestHandler
 
@@ -157,7 +156,7 @@ class Program
   }
 }
 ```
-<!-- 
+
 ### HttpClient
 
 ```c#
@@ -165,49 +164,39 @@ using System;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
+using Blest;
 
 class Program
 {
-    static async Task Main()
+  static async Task Main()
+  {
+    // Create a client
+    Dictionary<string, object?> options = new Dictionary<string, object?>
     {
-        using var client = new HttpClient();
-        client.BaseAddress = new Uri("http://localhost:8080");
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "token");
+      ["headers"] = new Dictionary<string, object?>
+      {
+        ["Authorization"] = "Bearer token"
+      }
+    };
+    var client = new HttpClient("http://localhost:8080", options);
 
-        var data = new { name = "Steve" };
-        var response = await client.PostAsJsonAsync("greet", data);
-        var result = await response.Content.ReadAsAsync<GreetingResponse>();
-
-        // Do something with the result
+    try
+    {
+      // Send a request
+      var selector = new object[] { "greeting" };
+      IDictionary<string, object?> parameters = new Dictionary<string, object?> {
+          { "name", "Steve" }
+      };
+      var result = await client.Request("greet", parameters, selector);
+      // Do something with the result
     }
-}
-
-public class GreetingResponse
-{
-    // Define the structure of the response object
-    public string Greeting { get; set; }
-}
-
-
-
-const { createHttpClient } = require('blest-js')
-
-// Create a client
-const request = createHttpClient('http://localhost:8080', {
-  headers: {
-    'Authorization': 'Bearer token'
+    catch (Exception error)
+    {
+      // Do something in case of error
+    }
   }
-})
-
-// Send a request
-request('greet', { name: 'Steve' }, ['greeting'])
-.then((result) => {
-  // Do something with the result
-})
-.catch((error) => {
-  // Do something in case of error
-})
-``` -->
+}
+```
 
 ## License
 

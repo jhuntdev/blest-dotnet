@@ -207,6 +207,7 @@ namespace Blest
     public class HttpClient
     {
         private readonly string url;
+        private readonly Dictionary<string, object?> options;
         private readonly int maxBatchSize = 100;
         private readonly List<object?[]> queue = new List<object?[]>();
         private Timer? timeout;
@@ -216,6 +217,21 @@ namespace Blest
         public HttpClient(string url)
         {
             this.url = url;
+            this.options = new Dictionary<string, object?>();
+        }
+        
+        public HttpClient(string url, Dictionary<string, object?> options)
+        {
+            this.url = url;
+            this.options = options;
+            if (options.TryGetValue("headers", out var headersObj) && headersObj is Dictionary<string, object?> headers)
+            {
+                if (headers.TryGetValue("Authorization", out var authorizationObj) && authorizationObj is string authorization)
+                {
+                    string[] words = authorization.Split(' ', 2);
+                    this.client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(words[0], words.Length > 1 ? words[1] : null);
+                }
+            }
         }
 
         public async Task<object> Request(string route, IDictionary<string, object?>? parameters = null, IList<object?>? selector = null)
