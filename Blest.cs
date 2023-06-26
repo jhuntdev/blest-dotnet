@@ -639,7 +639,7 @@ namespace Blest
                 }
                 return filteredObj;
             }
-            return new Dictionary<string, object?>();
+            return obj;
         }
     }
 }
