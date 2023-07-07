@@ -3,12 +3,12 @@
   <PropertyGroup>
     <OutputType>Library</OutputType>
     <TargetFramework>net7.0</TargetFramework>
-    <PackageId>Blest.Blest</PackageId>
+    <PackageId>Blest</PackageId>
     <Version>0.0.1</Version>
-    <Authors>JHunt</Authors>
+    <Authors>jhuntdev</Authors>
     <Company></Company>
-    <Description>The PHP reference implementation of BLEST (Batch-able, Lightweight, Encrypted State Transfer), an improved communication protocol for web APIs which leverages JSON, supports request batching and selective returns, and provides a modern alternative to REST.</Description>
-    <PackageProjectUrl>https://github.com/jhuntdev/blest-dotnet</PackageProjectUrl>
+    <Description>The .NET reference implementation of BLEST (Batch-able, Lightweight, Encrypted State Transfer), an improved communication protocol for web APIs which leverages JSON, supports request batching and selective returns, and provides a modern alternative to REST.</Description>
+    <PackageProjectUrl>https://blest.jhunt.dev</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/jhuntdev/blest-dotnet</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>

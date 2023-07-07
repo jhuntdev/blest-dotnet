@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>Blest</id>
+    <version>0.0.1</version>
+    <authors>jhuntdev</authors>
+    <owners>jhuntdev</owners>
+    <license type="expression">MIT</license>
+    <!-- <icon>icon.png</icon> -->
+    <projectUrl>https://blest.jhunt.dev</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>The .NET reference implementation of BLEST (Batch-able, Lightweight, Encrypted State Transfer), an improved communication protocol for web APIs which leverages JSON, supports request batching and selective returns, and provides a modern alternative to REST.</description>
+    <!-- <releaseNotes></releaseNotes> -->
+    <copyright>Copyright 2023</copyright>
+    <tags>dotnet api blest</tags>
+  </metadata>
+</package>
