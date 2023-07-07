@@ -1,4 +1,4 @@
-# BLEST.NET
+# BLEST .NET
 
 The .NET reference implementation of BLEST (Batch-able, Lightweight, Encrypted State Transfer), an improved communication protocol for web APIs which leverages JSON, supports request batching and selective returns, and provides a modern alternative to REST.
 
@@ -15,13 +15,13 @@ For a front-end implementation in React, please visit https://github.com/jhuntde
 - Single Endpoint - Reduce complexity and improve data privacy
 - Fully Encrypted - Improve data privacy
 
-<!-- ## Installation
+## Installation
 
-Install BLEST.NET from NuGet
+Install BLEST .NET from NuGet
 
 ```bash
-
-``` -->
+dotnet add package Blest
+```
 
 ## Usage
 

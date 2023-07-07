@@ -16,6 +16,7 @@ obj/
 packages/
 *.nuget.props
 *.nuget.targets
+/nupkgs
 
 # Test Results
 [Tt]est[Rr]esult*/
