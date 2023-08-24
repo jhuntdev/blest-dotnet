@@ -2,7 +2,7 @@
 
 The .NET reference implementation of BLEST (Batch-able, Lightweight, Encrypted State Transfer), an improved communication protocol for web APIs which leverages JSON, supports request batching and selective returns, and provides a modern alternative to REST.
 
-To learn more about BLEST, please refer to the white paper: https://jhunt.dev/BLEST%20White%20Paper.pdf
+To learn more about BLEST, please visit the website: https://blest.jhunt.dev
 
 For a front-end implementation in React, please visit https://github.com/jhuntdev/blest-react
 
@@ -25,9 +25,7 @@ dotnet add package Blest
 
 ## Usage
 
-Use the `RequestHandler` class to create a request handler suitable for use in an existing .NET application. Use the `HttpServer` class to create a standalone HTTP server for your request handler. Use the `HttpClient` class to create a BLEST HTTP client.
-
-### RequestHandler
+This core class of this library has an interface similar to ASP.NET Core. It also provides a `Router` class with a `Handle` method for use in an existing .NET API and an `HttpClient` class with a `Request` method for making BLEST HTTP requests.
 
 ```c#
 using System;
@@ -35,8 +33,11 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using Blest;
 
+// Instantiate your app
+var app = new Blest({ "timeout": 1000, "cors": true });
+
 // Create some middleware (optional)
-var authMiddleware = new Action<IDictionary<string, object?>, Dictionary<string, object?>>((parameters, context) =>
+app.Use(async (parameters, context) =>
 {
   if (parameters.ContainsKey("name"))
   {
@@ -52,7 +53,7 @@ var authMiddleware = new Action<IDictionary<string, object?>, Dictionary<string,
 });
 
 // Create a route controller
-var greetController = new Func<IDictionary<string, object?>, Dictionary<string, object?>, Dictionary<string, object?>>((parameters, context) =>
+app.Map('greet', async (parameters, context) =>
 {
   if (!context.ContainsKey("user") || context["user"] == null || !((Dictionary<string, object?>)context["user"]).ContainsKey("name"))
   {
@@ -65,38 +66,11 @@ var greetController = new Func<IDictionary<string, object?>, Dictionary<string, 
   };
 });
 
-// Define your router
-var router = new Dictionary<string, List<Delegate>>
-{
-  { "greet", new List<Delegate> { authMiddleware, greetController } }
-};
-
-// Create a request handler
-var requestHandler = new RequestHandler(router);
-
-// Parse incoming JSON payload
-Dictionary<string, object?> payload = YourCustomJsonSerializer(request.Body);
-
-// Assemble context object
-Dictionary<string, object?> context = {
-  { "headers", request.Headers }
-};
-
-// Use the request handler
-object?[] resultError = await requestHandler.Handle(payload, context);
-dynamic? result = resultError[0];
-dynamic? error = resultError[1];
-if (error != null)
-{
-  // Do something in case of error
-}
-else
-{
-  // Do something with the result
-}
+// Start your BLEST server
+app.Run();
 ```
 
-### HttpServer
+### Router
 
 ```c#
 using System;
@@ -104,56 +78,49 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using Blest;
 
-class Program
+// Instantiate your Router
+var router = new Router({ "timeout": 1000 });
+
+// Create some middleware (optional)
+router.Use(async (parameters, context) =>
 {
-  public static async Task Main()
+  if (parameters.ContainsKey("name"))
   {
-    // Create some middleware (optional)
-    var authMiddleware = new Action<IDictionary<string, object?>, Dictionary<string, object?>>((parameters, context) =>
+    context["user"] = new Dictionary<string, object?>
     {
-        if (parameters.ContainsKey("name"))
-        {
-            context["user"] = new Dictionary<string, object?>
-            {
-                { "name", parameters["name"] }
-            };
-        }
-        else
-        {
-            throw new Exception("Unauthorized");
-        }
-    });
-
-    // Create a route controller
-    var greetController = new Func<IDictionary<string, object?>, Dictionary<string, object?>, Dictionary<string, object?>>((parameters, context) =>
-    {
-        if (!context.ContainsKey("user") || context["user"] == null || !((Dictionary<string, object?>)context["user"]).ContainsKey("name"))
-        {
-            throw new Exception("Unauthorized");
-        }
-
-        return new Dictionary<string, object?>
-        {
-            { "greeting", "Hi, " + ((Dictionary<string, object?>)context["user"])["name"] + "!" }
-        };
-    });
-
-    // Define your router
-    var router = new Dictionary<string, List<Delegate>>
-    {
-        { "greet", new List<Delegate> { authMiddleware, greetController } }
+      { "name", parameters["name"] }
     };
-
-    // Create a request handler
-    var requestHandler = new RequestHandler(router);
-
-    // Create a server
-    HttpServer server = new HttpServer(requestHandler);
-
-    // Listen for requests
-    Console.WriteLine("Server listening on port 8080");
-    await server.Listen("http://localhost:8080/");
   }
+  else
+  {
+    throw new Exception("Unauthorized");
+  }
+});
+
+// Create a route controller
+router.Map('greet', async (parameters, context) =>
+{
+  if (!context.ContainsKey("user") || context["user"] == null || !((Dictionary<string, object?>)context["user"]).ContainsKey("name"))
+  {
+    throw new Exception("Unauthorized");
+  }
+
+  return new Dictionary<string, object?>
+  {
+    { "greeting", "Hi, " + ((Dictionary<string, object?>)context["user"])["name"] + "!" }
+  };
+});
+
+// ...later in your application
+// Handle a request
+result, error = router.Handle(jsonData, context);
+if (error is not null)
+{
+  // do something in case of error
+}
+else
+{
+  // do something with the result
 }
 ```
 
@@ -183,10 +150,10 @@ class Program
     try
     {
       // Send a request
-      var selector = new object[] { "greeting" };
       IDictionary<string, object?> parameters = new Dictionary<string, object?> {
           { "name", "Steve" }
       };
+      var selector = new object[] { "greeting" };
       var result = await client.Request("greet", parameters, selector);
       // Do something with the result
     }
