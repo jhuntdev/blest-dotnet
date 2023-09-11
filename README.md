@@ -25,7 +25,7 @@ dotnet add package Blest
 
 ## Usage
 
-This core class of this library has an interface similar to ASP.NET Core. It also provides a `Router` class with a `Handle` method for use in an existing .NET API and an `HttpClient` class with a `Request` method for making BLEST HTTP requests.
+The `Blest` class of this library has an interface similar to ASP.NET Core. It also provides a `Router` class with a `Handle` method for use in an existing .NET API and an `HttpClient` class with a `Request` method for making BLEST HTTP requests.
 
 ```c#
 using System;
