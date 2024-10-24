@@ -1,6 +1,6 @@
 # BLEST .NET
 
-The .NET reference implementation of BLEST (Batch-able, Lightweight, Encrypted State Transfer), an improved communication protocol for web APIs which leverages JSON, supports request batching and selective returns, and provides a modern alternative to REST.
+The .NET reference implementation of BLEST (Batch-able, Lightweight, Encrypted State Transfer), an improved communication protocol for web APIs which leverages JSON, supports request batching by default, and provides a modern alternative to REST.
 
 To learn more about BLEST, please visit the website: https://blest.jhunt.dev
 
@@ -10,8 +10,7 @@ For a front-end implementation in React, please visit https://github.com/jhuntde
 
 - Built on JSON - Reduce parsing time and overhead
 - Request Batching - Save bandwidth and reduce load times
-- Compact Payloads - Save more bandwidth
-- Selective Returns - Save even more bandwidth
+- Compact Payloads - Save even more bandwidth
 - Single Endpoint - Reduce complexity and improve data privacy
 - Fully Encrypted - Improve data privacy
 
@@ -37,13 +36,13 @@ using Blest;
 var app = new Blest({ "timeout": 1000, "cors": true });
 
 // Create some middleware (optional)
-app.Use(async (parameters, context) =>
+app.Use(async (body, context) =>
 {
-  if (parameters.ContainsKey("name"))
+  if (context.ContainsKey("headers") && context["headers"]["auth"] === "myToken")
   {
     context["user"] = new Dictionary<string, object?>
     {
-      { "name", parameters["name"] }
+      // user info for example
     };
   }
   else
@@ -53,16 +52,11 @@ app.Use(async (parameters, context) =>
 });
 
 // Create a route controller
-app.Map('greet', async (parameters, context) =>
+app.Map('greet', async (body, context) =>
 {
-  if (!context.ContainsKey("user") || context["user"] == null || !((Dictionary<string, object?>)context["user"]).ContainsKey("name"))
-  {
-    throw new Exception("Unauthorized");
-  }
-
   return new Dictionary<string, object?>
   {
-    { "greeting", "Hi, " + ((Dictionary<string, object?>)context["user"])["name"] + "!" }
+    { "greeting", "Hi, " + body["name"] + "!" }
   };
 });
 
@@ -82,13 +76,13 @@ using Blest;
 var router = new Router({ "timeout": 1000 });
 
 // Create some middleware (optional)
-router.Use(async (parameters, context) =>
+router.Use(async (body, context) =>
 {
-  if (parameters.ContainsKey("name"))
+  if (context.ContainsKey("headers") && context["headers"]["auth"] === "myToken")
   {
     context["user"] = new Dictionary<string, object?>
     {
-      { "name", parameters["name"] }
+      // user info for example
     };
   }
   else
@@ -98,13 +92,8 @@ router.Use(async (parameters, context) =>
 });
 
 // Create a route controller
-router.Map('greet', async (parameters, context) =>
+router.Map('greet', async (body, context) =>
 {
-  if (!context.ContainsKey("user") || context["user"] == null || !((Dictionary<string, object?>)context["user"]).ContainsKey("name"))
-  {
-    throw new Exception("Unauthorized");
-  }
-
   return new Dictionary<string, object?>
   {
     { "greeting", "Hi, " + ((Dictionary<string, object?>)context["user"])["name"] + "!" }
@@ -140,7 +129,7 @@ class Program
     // Create a client
     Dictionary<string, object?> options = new Dictionary<string, object?>
     {
-      ["headers"] = new Dictionary<string, object?>
+      ["httpHeaders"] = new Dictionary<string, object?>
       {
         ["Authorization"] = "Bearer token"
       }
@@ -150,11 +139,13 @@ class Program
     try
     {
       // Send a request
-      IDictionary<string, object?> parameters = new Dictionary<string, object?> {
+      IDictionary<string, object?> body = new Dictionary<string, object?> {
           { "name", "Steve" }
       };
-      var selector = new object[] { "greeting" };
-      var result = await client.Request("greet", parameters, selector);
+      IDictionary<string, object?> headers = new Dictionary<string, object?> {
+          { "auth", "myToken" }
+      };
+      var result = await client.Request("greet", body, headers);
       // Do something with the result
     }
     catch (Exception error)

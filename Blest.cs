@@ -103,8 +103,7 @@ namespace Blest
             {
                 handler = middleware.Concat(handlers).Concat(this.afterware).ToList(),
                 description = null,
-                parameters = null,
-                result = null,
+                schema = null,
                 visible = this.introspection,
                 validate = false,
                 timeout = this.timeout
@@ -132,24 +131,14 @@ namespace Blest
                 routes[route].description = (string)description;
             }
 
-            if (config.ContainsKey("parameters"))
+            if (config.ContainsKey("schema"))
             {
-                var parameters = config["parameters"];
-                if (!(parameters is Dictionary<string, object>))
+                var schema = config["schema"];
+                if (!(schema is Dictionary<string, object>))
                 {
-                    throw new Exception("Parameters should be a JSON schema");
+                    throw new Exception("Schema should be a JSON schema");
                 }
-                routes[route].parameters = (Dictionary<string, object?>)parameters;
-            }
-
-            if (config.ContainsKey("result"))
-            {
-                var result = config["result"];
-                if (!(result is Dictionary<string, object>))
-                {
-                    throw new Exception("Result should be a JSON schema");
-                }
-                routes[route].result = (Dictionary<string, object?>)result;
+                routes[route].schema = (Dictionary<string, object?>)schema;
             }
 
             if (config.ContainsKey("visible"))
@@ -264,8 +253,7 @@ namespace Blest
     {
         public List<Delegate> handler = new List<Delegate>();
         public string? description;
-        public Dictionary<string, object?>? parameters;
-        public Dictionary<string, object?>? result;
+        public Dictionary<string, object?>? schema;
         public bool? visible;
         public bool? validate;
         public int? timeout;
@@ -274,23 +262,40 @@ namespace Blest
     public static class Utilities
     {
         private static readonly Regex RouteRegex = new Regex(@"^[a-zA-Z][a-zA-Z0-9_\-\/]*[a-zA-Z0-9]$");
+        private static readonly Regex SystemRouteRegex = new Regex(@"^_[a-zA-Z][a-zA-Z0-9_\-\/]*[a-zA-Z0-9]$");
 
-        public static string? ValidateRoute(string route)
+        public static string? ValidateRoute(string route, boolean system)
         {
             if (string.IsNullOrEmpty(route))
             {
                 return "Route is required";
             }
-            else if (!RouteRegex.IsMatch(route))
+            else if (system && !SystemRouteRegex.IsMatch(route))
+            {
+                int routeLength = route.Length;
+                if (routeLength < 3)
+                {
+                    return "System route should be at least two characters long";
+                }
+                else if (route[0] !== '_')
+                {
+                    return "System route should start with an underscore";
+                }
+                else if (!char.IsLetterOrDigit(route[routeLength - 1]))
+                {
+                    return "System route should end with a letter or a number";
+                }
+                else
+                {
+                    return "System route should contain only letters, numbers, dashes, underscores, and forward slashes";
+                }
+            }
+            else if (!system && !RouteRegex.IsMatch(route))
             {
                 int routeLength = route.Length;
                 if (routeLength < 2)
                 {
                     return "Route should be at least two characters long";
-                }
-                else if (route[routeLength - 1] == '/')
-                {
-                    return "Route should not end in a forward slash";
                 }
                 else if (!char.IsLetter(route[0]))
                 {
@@ -590,7 +595,7 @@ namespace Blest
         private readonly string url;
         private readonly int maxBatchSize = 25;
         private readonly int bufferDelay = 10;
-        private readonly Dictionary<string, object?> headers = new Dictionary<string, object?>();
+        private readonly Dictionary<string, object?> httpHeaders = new Dictionary<string, object?>();
         private readonly List<object?[]> queue = new List<object?[]>();
         private Timer? timeout;
         private readonly System.Net.Http.HttpClient client = new System.Net.Http.HttpClient();
@@ -619,10 +624,10 @@ namespace Blest
                 {
                     this.bufferDelay = bufferDelay;
                 }
-                if (options["headers"] is Dictionary<string, object?> headers)
+                if (options["httpHeaders"] is Dictionary<string, object?> httpHeaders)
                 {
-                    this.headers = headers;
-                    if (headers.TryGetValue("Authorization", out var authorizationObj) && authorizationObj is string authorization)
+                    this.httpHeaders = httpHeaders;
+                    if (httpHeaders.TryGetValue("Authorization", out var authorizationObj) && authorizationObj is string authorization)
                     {
                         string[] words = authorization.Split(' ', 2);
                         this.client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(words[0], words.Length > 1 ? words[1] : null);
@@ -639,11 +644,11 @@ namespace Blest
             }
             else
             {
-                if (options["headers"] is not null)
+                if (options["httpHeaders"] is not null)
                 {
-                    if (!(options["headers"] is IDictionary<string, object>))
+                    if (!(options["httpHeaders"] is IDictionary<string, object>))
                     {
-                        return "\"headers\" option should be a dictionary";
+                        return "\"httpHeaders\" option should be a dictionary";
                     }
                 }
                 if (options["maxBatchSize"] is not null)
@@ -672,21 +677,21 @@ namespace Blest
             return null;
         }
 
-        public async Task<object> Request(string route, IDictionary<string, object?>? parameters = null, IList<object?>? selector = null)
+        public async Task<object> Request(string route, IDictionary<string, object?>? body = null, IDictionary<string, object?>? headers = null)
         {
             if (string.IsNullOrEmpty(route))
             {
                 throw new ArgumentException("Route is required");
             }
 
-            if (parameters != null && !(parameters is IDictionary<string, object?>))
+            if (body != null && !(body is IDictionary<string, object?>))
             {
-                throw new ArgumentException("Params should be a dictionary");
+                throw new ArgumentException("Body should be a dictionary");
             }
 
-            if (selector != null && !(selector is object[]))
+            if (headers != null && !(headers is object[]))
             {
-                throw new ArgumentException("Selector should be a list");
+                throw new ArgumentException("Headers should be a dictionary");
             }
 
             string id = Guid.NewGuid().ToString();
@@ -697,7 +702,7 @@ namespace Blest
                 pendingRequests[id] = tcs;
             }
 
-            var item = new object?[] { id, route, parameters, selector };
+            var item = new object?[] { id, route, body, headers };
             queue.Add(item);
 
             if (timeout == null)
@@ -939,8 +944,8 @@ namespace Blest
 
                 string? id = requestList.Count > 0 ? requestList[0] as string : null;
                 string? route = requestList.Count > 1 ? requestList[1] as string : null;
-                Dictionary<string, object>? parameters = requestList.Count > 2 ? requestList[2] as Dictionary<string, object> : null;
-                List<object>? selector = requestList.Count > 3 ? requestList[3] as List<object> : null;
+                Dictionary<string, object>? body = requestList.Count > 2 ? requestList[2] as Dictionary<string, object> : null;
+                Dictionary<string, object>? headers = requestList.Count > 3 ? requestList[3] as Dictionary<string, object> : null;
 
                 if (string.IsNullOrEmpty(id))
                 {
@@ -950,13 +955,13 @@ namespace Blest
                 {
                     return HandleError(400, "Request item should have a route");
                 }
-                if (parameters != null && !(parameters is Dictionary<string, object>))
+                if (body != null && !(body is Dictionary<string, object>))
                 {
-                    return HandleError(400, "Request item parameters should be a JSON object");
+                    return HandleError(400, "Request item body should be a JSON object");
                 }
-                if (selector != null && !(selector is List<object>))
+                if (headers != null && !(headers is Dictionary<string, object>))
                 {
-                    return HandleError(400, "Request item selector should be a JSON array");
+                    return HandleError(400, "Request item headers should be a JSON object");
                 }
 
                 if (uniqueIds.Contains(id))
@@ -972,27 +977,32 @@ namespace Blest
                 {
                     { "id", id },
                     { "route", route },
-                    { "parameters", parameters },
-                    { "selector", selector },
+                    { "body", body },
+                    { "headers", headers },
                 };
 
-                Dictionary<string, object?> myContext = new Dictionary<string, object?>
+                Dictionary<string, object?> requestContext = new Dictionary<string, object?>
                 {
-                    { "requestId", id },
-                    { "routeName", route },
-                    { "selector", selector },
-                    { "requestTime", DateTime.Now },
+                    // { "id", id },
+                    // { "route", route },
+                    // { "headers", headers },
+                    // { "time", DateTime.Now },
                 };
 
                 foreach (var item in context)
                 {
-                    myContext[item.Key] = item.Value;
+                    requestContext[item.Key] = item.Value;
                 }
 
+                requestContext["id"] = id;
+                requestContext["route"] = route;
+                requestContext["headers"] = headers;
+                requestContext["time"] = DateTime.Now;
+
                 if (thisRoute?.timeout is not null) {
-                    tasks.Add(RouteReducerWithTimeout(routeHandler, requestObject, myContext, thisRoute?.timeout));
+                    tasks.Add(RouteReducerWithTimeout(routeHandler, requestObject, requestContext, thisRoute?.timeout));
                 } else {
-                    tasks.Add(RouteReducer(routeHandler, requestObject, myContext));
+                    tasks.Add(RouteReducer(routeHandler, requestObject, requestContext));
                 }
             }
 
@@ -1042,7 +1052,7 @@ namespace Blest
             try
             {
                 Dictionary<string, object?> safeContext = context != null ? CloneDeep(context) : new Dictionary<string, object?>();
-                IDictionary<string, object?> parameters = request["parameters"] as IDictionary<string, object?> ?? new Dictionary<string, object?> {};
+                IDictionary<string, object?> body = request["body"] as IDictionary<string, object?> ?? new Dictionary<string, object?> {};
                 Dictionary<string, object?>? result = null;
 
                 for (int i = 0; i < handlerList.Count; i++)
@@ -1072,27 +1082,27 @@ namespace Blest
                     }
                     else if (delegateItem is Func<IDictionary<string, object?>, Dictionary<string, object?>, Dictionary<string, object?>> syncFunc)
                     {
-                        tempResult = syncFunc(parameters, safeContext) as Dictionary<string, object?>;
+                        tempResult = syncFunc(body, safeContext) as Dictionary<string, object?>;
                     }
                     else if (delegateItem is Func<IDictionary<string, object?>, Dictionary<string, object?>, object> syncObjFunc)
                     {
-                        tempResult = syncObjFunc(parameters, safeContext) as Dictionary<string, object?>;
+                        tempResult = syncObjFunc(body, safeContext) as Dictionary<string, object?>;
                     }
                     else if (delegateItem is Func<IDictionary<string, object?>, Dictionary<string, object?>, object?> syncAnyFunc)
                     {
-                        tempResult = syncAnyFunc(parameters, safeContext) as Dictionary<string, object?>;
+                        tempResult = syncAnyFunc(body, safeContext) as Dictionary<string, object?>;
                     }
                     else if (delegateItem is Func<IDictionary<string, object?>, Dictionary<string, object?>, Task<Dictionary<string, object?>>> asyncFunc)
                     {
-                        tempResult = await asyncFunc(parameters, safeContext) as Dictionary<string, object?>;
+                        tempResult = await asyncFunc(body, safeContext) as Dictionary<string, object?>;
                     }
                     else if (delegateItem is Func<IDictionary<string, object?>, Dictionary<string, object?>, Task<object>> asyncObjFunc)
                     {
-                        tempResult = await asyncObjFunc(parameters, safeContext) as Dictionary<string, object?>;
+                        tempResult = await asyncObjFunc(body, safeContext) as Dictionary<string, object?>;
                     }
                     else if (delegateItem is Func<IDictionary<string, object?>, Dictionary<string, object?>, Task<object?>> asyncAnyFunc)
                     {
-                        tempResult = await asyncAnyFunc(parameters, safeContext) as Dictionary<string, object?>;
+                        tempResult = await asyncAnyFunc(body, safeContext) as Dictionary<string, object?>;
                     }
                     else
                     {
@@ -1117,10 +1127,10 @@ namespace Blest
                     throw new Exception("The result, if any, should be a dictionary");
                 }
 
-                if (result != null && request["selector"] is List<object> selector)
-                {
-                    result = FilterObject(result, selector);
-                }
+                // if (result != null && request["selector"] is List<object> selector)
+                // {
+                //     result = FilterObject(result, selector);
+                // }
 
                 return new object?[] { request["id"], request["route"], result, (object?) null };
             }
