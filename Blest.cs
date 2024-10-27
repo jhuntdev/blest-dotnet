@@ -932,6 +932,7 @@ namespace Blest
                 context = new Dictionary<string, object?>();
             }
 
+            string batchId = Guid.NewGuid().ToString();
             List<string> uniqueIds = new List<string>();
             List<Task<object?[]>> tasks = new List<Task<object?[]>>();
 
@@ -994,10 +995,10 @@ namespace Blest
                     requestContext[item.Key] = item.Value;
                 }
 
-                requestContext["id"] = id;
+                requestContext["batchId"] = batchId;
+                requestContext["requestId"] = id;
                 requestContext["route"] = route;
                 requestContext["headers"] = headers;
-                requestContext["time"] = DateTime.Now;
 
                 if (thisRoute?.timeout is not null) {
                     tasks.Add(RouteReducerWithTimeout(routeHandler, requestObject, requestContext, thisRoute?.timeout));
